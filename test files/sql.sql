@@ -1,0 +1,10 @@
+insert into MOCK_DATA (id, first_name, last_name, email, gender, ip_address) values (1, 'Danyette', 'Spellacy', 'dspellacy0@bbb.org', 'Female', '229.167.76.178');
+insert into MOCK_DATA (id, first_name, last_name, email, gender, ip_address) values (2, 'Bryna', 'Sartin', 'bsartin1@engadget.com', 'Bigender', '173.62.56.31');
+insert into MOCK_DATA (id, first_name, last_name, email, gender, ip_address) values (3, 'Tan', 'Stener', 'tstener2@examiner.com', 'Male', '96.250.83.154');
+insert into MOCK_DATA (id, first_name, last_name, email, gender, ip_address) values (4, 'Sergio', 'Ayer', 'sayer3@google.co.jp', 'Male', '33.3.120.238');
+insert into MOCK_DATA (id, first_name, last_name, email, gender, ip_address) values (5, 'Jard', 'Chaloner', 'jchaloner4@seesaa.net', 'Male', '18.123.69.62');
+insert into MOCK_DATA (id, first_name, last_name, email, gender, ip_address) values (6, 'Lonee', 'Larver', 'llarver5@github.io', 'Female', '54.90.123.45');
+insert into MOCK_DATA (id, first_name, last_name, email, gender, ip_address) values (7, 'Silvain', 'Goodreid', 'sgoodreid6@java.com', 'Male', '12.25.136.148');
+insert into MOCK_DATA (id, first_name, last_name, email, gender, ip_address) values (8, 'Mychal', 'Filipiak', 'mfilipiak7@cbslocal.com', 'Non-binary', '127.51.27.218');
+insert into MOCK_DATA (id, first_name, last_name, email, gender, ip_address) values (9, 'Madison', 'MacGowing', 'mmacgowing8@netvibes.com', 'Male', '25.185.185.200');
+insert into MOCK_DATA (id, first_name, last_name, email, gender, ip_address) values (10, 'Mohammed', 'Manderson', 'mmanderson9@ibm.com', 'Male', '54.205.39.38');

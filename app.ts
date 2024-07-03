@@ -253,6 +253,85 @@ app.post('/excel-csv', upload.single('file'), (req: Request, res: Response) => {
   });
 });
 
+/**
+ * @swagger
+ * /excel-sql:
+ *   post:
+ *     summary: Upload an excel file to be converted to SQL
+ *     description: This will return a SQL file
+ *     tags:
+ *       - Excel
+ *     requestBody:
+ *       description: Excel file to be converted
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       '200':
+ *         description: Successfully created a new document
+ *       '400':
+ *         description: Bad request
+ */
+app.post('/excel-sql', upload.single('file'), (req: Request, res: Response) => {
+  if (!req.file) return res.status(400).send('No file uploaded.');
+
+  const filePath = req.file.path;
+  const workbook = xlsx.readFile(filePath);
+  const sheetNames = workbook.SheetNames;
+  const tempDir = os.tmpdir();
+  const sqlFilePath = path.join(tempDir, `${req.file.filename}.sql`);
+  const sqlStatements: string[] = [];
+
+  sheetNames.forEach((sheetName) => {
+    const worksheet = workbook.Sheets[sheetName];
+    const jsonData: any = xlsx.utils.sheet_to_json(worksheet);
+
+    if (jsonData.length > 0) {
+      const columns = Object.keys(jsonData[0])
+        .map((col) => `\`${col}\``)
+        .join(', ');
+
+      jsonData.forEach((row: any) => {
+        const values = Object.values(row)
+          .map((value) =>
+            typeof value === 'string' ? `'${value.replace(/'/g, "''")}'` : value
+          )
+          .join(', ');
+        sqlStatements.push(
+          `INSERT INTO \`${sheetName}\` (${columns}) VALUES (${values});`
+        );
+      });
+    }
+  });
+
+  fs.writeFileSync(sqlFilePath, sqlStatements.join('\n'));
+
+  res.setHeader(
+    'Content-disposition',
+    `attachment; filename=${req.file?.originalname}.sql`
+  );
+  res.setHeader('Content-type', 'application/sql');
+  res.sendFile(sqlFilePath, (err) => {
+    if (err) {
+      res.status(500).send('Error downloading the file.');
+    } else {
+      // Optional: clean up the uploaded Excel and SQL files
+      // fs.unlink(filePath, (unlinkErr) => {
+      //   if (unlinkErr) console.error(`Error deleting file ${filePath}`);
+      // });
+      // fs.unlink(sqlFilePath, (unlinkErr) => {
+      //   if (unlinkErr) console.error(`Error deleting file ${sqlFilePath}`);
+      // });
+    }
+  });
+});
+
 //#endregion
 
 //#region Server setup

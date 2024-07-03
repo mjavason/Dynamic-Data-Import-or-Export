@@ -332,6 +332,83 @@ app.post('/excel-sql', upload.single('file'), (req: Request, res: Response) => {
   });
 });
 
+/**
+ * @swagger
+ * /excel-xml:
+ *   post:
+ *     summary: Upload an excel file to be converted to XML
+ *     description: This will return an XML file
+ *     tags:
+ *       - Excel
+ *     requestBody:
+ *       description: Excel file to be converted
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       '200':
+ *         description: Successfully created a new document
+ *       '400':
+ *         description: Bad request
+ */
+app.post('/excel-xml', upload.single('file'), (req: Request, res: Response) => {
+  if (!req.file) {
+    return res.status(400).send('No file uploaded.');
+  }
+
+  const filePath = req.file.path;
+  const workbook = xlsx.readFile(filePath);
+  const sheetNames = workbook.SheetNames;
+  const tempDir = os.tmpdir();
+  const xmlFilePath = path.join(tempDir, `${req.file.filename}.xml`);
+  let xmlContent = '<?xml version="1.0" encoding="UTF-8"?>\n<workbook>\n';
+  xmlContent += '<?xml-stylesheet type="text/xsl" href="style.xsl"?>\n'; // Optional: Add a reference to an XSL stylesheet
+
+  sheetNames.forEach((sheetName) => {
+    const worksheet = workbook.Sheets[sheetName];
+    const jsonData = xlsx.utils.sheet_to_json(worksheet);
+
+    xmlContent += `  <sheet name="${sheetName}">\n`;
+    jsonData.forEach((row: any) => {
+      xmlContent += `    <row>\n`;
+      Object.entries(row).forEach(([key, value]) => {
+        xmlContent += `      <${key}>${value}</${key}>\n`;
+      });
+      xmlContent += `    </row>\n`;
+    });
+    xmlContent += `  </sheet>\n`;
+  });
+
+  xmlContent += '</workbook>';
+
+  fs.writeFileSync(xmlFilePath, xmlContent);
+
+  res.setHeader(
+    'Content-disposition',
+    `attachment; filename=${req.file?.originalname}.xml`
+  );
+  res.setHeader('Content-type', 'application/xml');
+  res.sendFile(xmlFilePath, (err) => {
+    if (err) {
+      res.status(500).send('Error downloading the file.');
+    } else {
+      // Optional: clean up the uploaded Excel and XML files
+      // fs.unlink(filePath, (unlinkErr) => {
+      //   if (unlinkErr) console.error(`Error deleting file ${filePath}`);
+      // });
+      // fs.unlink(xmlFilePath, (unlinkErr) => {
+      //   if (unlinkErr) console.error(`Error deleting file ${xmlFilePath}`);
+      // });
+    }
+  });
+});
+
 //#endregion
 
 //#region Server setup

@@ -95,6 +95,8 @@ const baseURL = 'https://httpbin.org';
 
 //#region code here
 
+//#region excel
+
 /**
  * @swagger
  * /excel-json:
@@ -408,6 +410,81 @@ app.post('/excel-xml', upload.single('file'), (req: Request, res: Response) => {
     }
   });
 });
+//#endregion excel
+
+//#region csv
+
+/**
+ * @swagger
+ * /csv-excel:
+ *   post:
+ *     summary: Upload a CSV file to be converted to Excel
+ *     description: This will return an Excel file
+ *     tags:
+ *       - CSV
+ *     requestBody:
+ *       description: CSV file to be converted
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       '200':
+ *         description: Successfully created a new document
+ *       '400':
+ *         description: Bad request
+ */
+app.post('/csv-excel', upload.single('file'), (req: Request, res: Response) => {
+  if (!req.file) return res.status(400).send('No file uploaded.');
+
+  const filePath = req.file.path;
+  const workbook = xlsx.utils.book_new();
+  const sheetName = path.parse(req.file.originalname).name;
+
+  // Read the CSV file
+  const csvData = fs.readFileSync(filePath, 'utf8');
+  const rows = csvData.split('\n').map((line) => line.split(','));
+
+  // Create a worksheet from the CSV data
+  const worksheet = xlsx.utils.aoa_to_sheet(rows);
+
+  // Add the worksheet to the workbook
+  xlsx.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+  // Generate the Excel file
+  const tempDir = os.tmpdir();
+  const excelFilePath = path.join(tempDir, `${req.file.filename}.xlsx`);
+  xlsx.writeFile(workbook, excelFilePath);
+
+  res.setHeader(
+    'Content-disposition',
+    `attachment; filename=${req.file?.originalname}.xlsx`
+  );
+  res.setHeader(
+    'Content-type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  res.sendFile(excelFilePath, (err) => {
+    if (err) {
+      res.status(500).send('Error downloading the file.');
+    } else {
+      // Optional: clean up the uploaded CSV and generated Excel files
+      // fs.unlink(filePath, (unlinkErr) => {
+      //   if (unlinkErr) console.error(`Error deleting file ${filePath}`);
+      // });
+      // fs.unlink(excelFilePath, (unlinkErr) => {
+      //   if (unlinkErr) console.error(`Error deleting file ${excelFilePath}`);
+      // });
+    }
+  });
+});
+
+//#endregion
 
 //#endregion
 

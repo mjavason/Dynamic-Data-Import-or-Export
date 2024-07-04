@@ -12,6 +12,7 @@ import path from 'path';
 import fs from 'fs';
 import AdmZip from 'adm-zip';
 import { parse } from 'csv-parse';
+import { create } from 'xmlbuilder2';
 
 //#region app setup
 const app = express();
@@ -645,6 +646,96 @@ app.post('/csv-sql', upload.single('file'), (req: Request, res: Response) => {
           // });
           // fs.unlink(sqlFilePath, (unlinkErr) => {
           //   if (unlinkErr) console.error(`Error deleting file ${sqlFilePath}`);
+          // });
+        }
+      });
+    }
+  );
+});
+
+/**
+ * @swagger
+ * /csv-xml:
+ *   post:
+ *     summary: Upload a CSV file to be converted to XML
+ *     description: This will return an XML file
+ *     tags:
+ *       - CSV
+ *     requestBody:
+ *       description: CSV file to be converted
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       '200':
+ *         description: Successfully created a new document
+ *       '400':
+ *         description: Bad request
+ */
+app.post('/csv-xml', upload.single('file'), (req: Request, res: Response) => {
+  if (!req.file) {
+    return res.status(400).send('No file uploaded.');
+  }
+
+  const filePath = req.file.path;
+  const fileName = req.file.filename;
+  const csvData = fs.readFileSync(filePath, 'utf8');
+  const records: any[] = [];
+  const rootElementName = path.parse(req.file.originalname).name;
+
+  parse(
+    csvData,
+    {
+      columns: true,
+      skip_empty_lines: true,
+    },
+    (err, parsedData) => {
+      if (err) {
+        return res.status(500).send('Error parsing CSV file.');
+      }
+
+      records.push(...parsedData);
+
+      // Create XML content
+      const xml = create({ version: '1.0', encoding: 'UTF-8' }).ele(
+        rootElementName
+      );
+
+      records.forEach((record) => {
+        const item = xml.ele('item');
+        Object.keys(record).forEach((key) => {
+          item.ele(key).txt(record[key]);
+        });
+      });
+
+      const xmlContent = xml.end({ prettyPrint: true });
+
+      // Generate the XML file
+      const tempDir = os.tmpdir();
+      const xmlFilePath = path.join(tempDir, `${fileName}.xml`);
+      fs.writeFileSync(xmlFilePath, xmlContent);
+
+      res.setHeader(
+        'Content-disposition',
+        `attachment; filename=${req.file?.originalname}.xml`
+      );
+      res.setHeader('Content-type', 'application/xml');
+      res.sendFile(xmlFilePath, (err) => {
+        if (err) {
+          res.status(500).send('Error downloading the file.');
+        } else {
+          // Optional: clean up the uploaded CSV and generated XML files
+          // fs.unlink(filePath, (unlinkErr) => {
+          //   if (unlinkErr) console.error(`Error deleting file ${filePath}`);
+          // });
+          // fs.unlink(xmlFilePath, (unlinkErr) => {
+          //   if (unlinkErr) console.error(`Error deleting file ${xmlFilePath}`);
           // });
         }
       });

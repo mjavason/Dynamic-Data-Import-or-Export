@@ -59,15 +59,7 @@ const SWAGGER_OPTIONS = {
       {
         name: 'JSON',
         description: 'JSON file conversions',
-      },
-      {
-        name: 'SQL',
-        description: 'SQL file conversions',
-      },
-      {
-        name: 'XML',
-        description: 'XML file conversions',
-      },
+      }
     ],
   },
   apis: ['**/*.ts'], // Define the paths to your API routes

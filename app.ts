@@ -140,8 +140,6 @@ app.post(
       jsonResult[sheetName] = xlsx.utils.sheet_to_json(worksheet);
     });
 
-    const tempDir = os.tmpdir();
-
     // Ensure the directory exists
     // const jsonDir = path.join(__dirname, 'uploads');
     // if (!fs.existsSync(jsonDir)) fs.mkdirSync(jsonDir);
@@ -212,7 +210,6 @@ app.post('/excel-csv', upload.single('file'), (req: Request, res: Response) => {
   const fileName = req.file.filename;
   const workbook = xlsx.readFile(filePath);
   const sheetNames = workbook.SheetNames;
-  const tempDir = os.tmpdir();
   const csvFiles: string[] = [];
 
   sheetNames.forEach((sheetName) => {
@@ -288,7 +285,6 @@ app.post('/excel-sql', upload.single('file'), (req: Request, res: Response) => {
   const filePath = req.file.path;
   const workbook = xlsx.readFile(filePath);
   const sheetNames = workbook.SheetNames;
-  const tempDir = os.tmpdir();
   const sqlFilePath = path.join(tempDir, `${req.file.filename}.sql`);
   const sqlStatements: string[] = [];
 
@@ -369,7 +365,6 @@ app.post('/excel-xml', upload.single('file'), (req: Request, res: Response) => {
   const filePath = req.file.path;
   const workbook = xlsx.readFile(filePath);
   const sheetNames = workbook.SheetNames;
-  const tempDir = os.tmpdir();
   const xmlFilePath = path.join(tempDir, `${req.file.filename}.xml`);
   let xmlContent = '<?xml version="1.0" encoding="UTF-8"?>\n<workbook>\n';
   xmlContent += '<?xml-stylesheet type="text/xsl" href="style.xsl"?>\n'; // Optional: Add a reference to an XSL stylesheet
@@ -459,7 +454,6 @@ app.post('/csv-excel', upload.single('file'), (req: Request, res: Response) => {
   xlsx.utils.book_append_sheet(workbook, worksheet, sheetName);
 
   // Generate the Excel file
-  const tempDir = os.tmpdir();
   const excelFilePath = path.join(tempDir, `${req.file.filename}.xlsx`);
   xlsx.writeFile(workbook, excelFilePath);
 
@@ -533,7 +527,6 @@ app.post('/csv-json', upload.single('file'), (req: Request, res: Response) => {
       records.push(...parsedData);
 
       // Generate the JSON file
-      const tempDir = os.tmpdir();
       const jsonFilePath = path.join(tempDir, `${fileName}.json`);
       fs.writeFileSync(jsonFilePath, JSON.stringify(records, null, 2));
 
@@ -627,7 +620,6 @@ app.post('/csv-sql', upload.single('file'), (req: Request, res: Response) => {
       });
 
       // Generate the SQL file
-      const tempDir = os.tmpdir();
       const sqlFilePath = path.join(tempDir, `${fileName}.sql`);
       fs.writeFileSync(sqlFilePath, sqlContent);
 
@@ -717,7 +709,6 @@ app.post('/csv-xml', upload.single('file'), (req: Request, res: Response) => {
       const xmlContent = xml.end({ prettyPrint: true });
 
       // Generate the XML file
-      const tempDir = os.tmpdir();
       const xmlFilePath = path.join(tempDir, `${fileName}.xml`);
       fs.writeFileSync(xmlFilePath, xmlContent);
 
@@ -742,6 +733,10 @@ app.post('/csv-xml', upload.single('file'), (req: Request, res: Response) => {
     }
   );
 });
+
+//#endregion csv
+
+//#region json
 
 /**
  * @swagger
@@ -783,7 +778,6 @@ app.post('/json-csv', upload.single('file'), (req: Request, res: Response) => {
   const csvContent = xlsx.utils.sheet_to_csv(worksheet);
 
   // Generate the CSV file
-  const tempDir = os.tmpdir();
   const csvFilePath = path.join(tempDir, `${req.file.filename}.csv`);
   fs.writeFileSync(csvFilePath, csvContent);
 
@@ -807,7 +801,72 @@ app.post('/json-csv', upload.single('file'), (req: Request, res: Response) => {
   });
 });
 
-//#endregion csv
+/**
+ * @swagger
+ * /json-excel:
+ *   post:
+ *     summary: Upload a JSON file to be converted to Excel
+ *     description: This will return an Excel file
+ *     tags:
+ *       - JSON
+ *     requestBody:
+ *       description: JSON file to be converted
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       '200':
+ *         description: Successfully created a new document
+ *       '400':
+ *         description: Bad request
+ */
+app.post(
+  '/json-excel',
+  upload.single('file'),
+  (req: Request, res: Response) => {
+    if (!req.file) {
+      return res.status(400).send('No file uploaded.');
+    }
+
+    const filePath = req.file.path;
+    const jsonData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+    // Convert JSON data to worksheet
+    const worksheet = xlsx.utils.json_to_sheet(jsonData);
+
+    // Create a new workbook and append the worksheet
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+
+    // Generate the Excel file
+    const excelFilePath = path.join(tempDir, `${req.file.filename}.xlsx`);
+    xlsx.writeFile(workbook, excelFilePath);
+
+    res.setHeader('Content-disposition', `attachment; filename=${req.file?.originalname}.xlsx`);
+    res.setHeader('Content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.sendFile(excelFilePath, (err) => {
+      if (err) {
+        res.status(500).send('Error downloading the file.');
+      } else {
+        // Optional: clean up the uploaded JSON and generated Excel files
+        // fs.unlink(filePath, (unlinkErr) => {
+        //   if (unlinkErr) console.error(`Error deleting file ${filePath}`);
+        // });
+        // fs.unlink(excelFilePath, (unlinkErr) => {
+        //   if (unlinkErr) console.error(`Error deleting file ${excelFilePath}`);
+        // });
+      }
+    });
+  }
+);
+
+//#endregion json
 
 //#endregion code here
 

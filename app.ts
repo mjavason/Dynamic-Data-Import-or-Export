@@ -558,6 +558,100 @@ app.post('/csv-json', upload.single('file'), (req: Request, res: Response) => {
   );
 });
 
+/**
+ * @swagger
+ * /csv-sql:
+ *   post:
+ *     summary: Upload a CSV file to be converted to SQL
+ *     description: This will return a SQL file with INSERT statements
+ *     tags:
+ *       - CSV
+ *     requestBody:
+ *       description: CSV file to be converted
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       '200':
+ *         description: Successfully created a new document
+ *       '400':
+ *         description: Bad request
+ */
+app.post('/csv-sql', upload.single('file'), (req: Request, res: Response) => {
+  if (!req.file) {
+    return res.status(400).send('No file uploaded.');
+  }
+
+  const filePath = req.file.path;
+  const csvData = fs.readFileSync(filePath, 'utf8');
+  const records: any[] = [];
+  const tableName = path.parse(req.file.originalname).name;
+  const fileName = req.file.filename;
+
+  parse(
+    csvData,
+    {
+      columns: true,
+      skip_empty_lines: true,
+    },
+    (err, parsedData) => {
+      if (err) {
+        return res.status(500).send('Error parsing CSV file.');
+      }
+
+      records.push(...parsedData);
+
+      let sqlContent = `CREATE TABLE ${tableName} (\n`;
+      const columns = Object.keys(records[0]);
+
+      // Define columns
+      columns.forEach((col, index) => {
+        sqlContent += `  ${col} TEXT${index < columns.length - 1 ? ',' : ''}\n`;
+      });
+      sqlContent += `);\n\n`;
+
+      // Insert data
+      records.forEach((record) => {
+        sqlContent += `INSERT INTO ${tableName} (${columns.join(
+          ', '
+        )}) VALUES (`;
+        sqlContent += columns.map((col) => `'${record[col]}'`).join(', ');
+        sqlContent += `);\n`;
+      });
+
+      // Generate the SQL file
+      const tempDir = os.tmpdir();
+      const sqlFilePath = path.join(tempDir, `${fileName}.sql`);
+      fs.writeFileSync(sqlFilePath, sqlContent);
+
+      res.setHeader(
+        'Content-disposition',
+        `attachment; filename=${req.file?.originalname}.sql`
+      );
+      res.setHeader('Content-type', 'application/sql');
+      res.sendFile(sqlFilePath, (err) => {
+        if (err) {
+          res.status(500).send('Error downloading the file.');
+        } else {
+          // Optional: clean up the uploaded CSV and generated SQL files
+          // fs.unlink(filePath, (unlinkErr) => {
+          //   if (unlinkErr) console.error(`Error deleting file ${filePath}`);
+          // });
+          // fs.unlink(sqlFilePath, (unlinkErr) => {
+          //   if (unlinkErr) console.error(`Error deleting file ${sqlFilePath}`);
+          // });
+        }
+      });
+    }
+  );
+});
+
 //#endregion csv
 
 //#endregion code here

@@ -93,6 +93,9 @@ const upload = multer({ storage });
 //#region keys and configs
 const PORT = process.env.PORT || 3000;
 const baseURL = 'https://httpbin.org';
+const sanitizeKey = (key: string): string => {
+  return key.replace(/^[^a-zA-Z_]+|[^a-zA-Z0-9_\-:.]/g, '_');
+}; // Function to sanitize JSON keys for XML element names
 //#endregion
 
 //#region code here
@@ -848,8 +851,14 @@ app.post(
     const excelFilePath = path.join(tempDir, `${req.file.filename}.xlsx`);
     xlsx.writeFile(workbook, excelFilePath);
 
-    res.setHeader('Content-disposition', `attachment; filename=${req.file?.originalname}.xlsx`);
-    res.setHeader('Content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader(
+      'Content-disposition',
+      `attachment; filename=${req.file?.originalname}.xlsx`
+    );
+    res.setHeader(
+      'Content-type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
     res.sendFile(excelFilePath, (err) => {
       if (err) {
         res.status(500).send('Error downloading the file.');
@@ -865,6 +874,165 @@ app.post(
     });
   }
 );
+
+/**
+ * @swagger
+ * /json-sql:
+ *   post:
+ *     summary: Upload a JSON file to be converted to SQL
+ *     description: This will return an SQL file with insert statements
+ *     tags:
+ *       - JSON
+ *     requestBody:
+ *       description: JSON file to be converted
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       '200':
+ *         description: Successfully created a new document
+ *       '400':
+ *         description: Bad request
+ */
+app.post('/json-sql', upload.single('file'), (req: Request, res: Response) => {
+  if (!req.file) {
+    return res.status(400).send('No file uploaded.');
+  }
+
+  const filePath = req.file.path;
+  const jsonData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+  if (!Array.isArray(jsonData)) {
+    return res
+      .status(400)
+      .send('Invalid JSON format. Expected an array of objects.');
+  }
+
+  // Convert JSON data to SQL insert statements
+  const tableName = path.parse(req.file.originalname).name;
+  const sqlStatements = jsonData
+    .map((row) => {
+      const columns = Object.keys(row).join(', ');
+      const values = Object.values(row)
+        .map((value) =>
+          typeof value === 'string' ? `'${value.replace(/'/g, "''")}'` : value
+        )
+        .join(', ');
+      return `INSERT INTO ${tableName} (${columns}) VALUES (${values});`;
+    })
+    .join('\n');
+
+  // Generate the SQL file
+  const tempDir = os.tmpdir();
+  const sqlFilePath = path.join(tempDir, `${req.file.filename}.sql`);
+  fs.writeFileSync(sqlFilePath, sqlStatements);
+
+  res.setHeader(
+    'Content-disposition',
+    `attachment; filename=${req.file?.originalname}.sql`
+  );
+  res.setHeader('Content-type', 'application/sql');
+  res.sendFile(sqlFilePath, (err) => {
+    if (err) {
+      res.status(500).send('Error downloading the file.');
+    } else {
+      // Optional: clean up the uploaded JSON and generated SQL files
+      // fs.unlink(filePath, (unlinkErr) => {
+      //   if (unlinkErr) console.error(`Error deleting file ${filePath}`);
+      // });
+      // fs.unlink(sqlFilePath, (unlinkErr) => {
+      //   if (unlinkErr) console.error(`Error deleting file ${sqlFilePath}`);
+      // });
+    }
+  });
+});
+
+/**
+ * @swagger
+ * /json-xml:
+ *   post:
+ *     summary: Upload a JSON file to be converted to XML
+ *     description: This will return an XML file
+ *     tags:
+ *       - JSON
+ *     requestBody:
+ *       description: JSON file to be converted
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       '200':
+ *         description: Successfully created a new document
+ *       '400':
+ *         description: Bad request
+ */
+app.post('/json-xml', upload.single('file'), (req: Request, res: Response) => {
+  if (!req.file) {
+    return res.status(400).send('No file uploaded.');
+  }
+
+  const filePath = req.file.path;
+  const jsonData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+  // Convert JSON data to XML
+  const root = create({ version: '1.0' }).ele('root');
+
+  const buildXML = (obj: any, parent: any) => {
+    Object.keys(obj).forEach((key) => {
+      const sanitizedKey = sanitizeKey(key);
+      if (Array.isArray(obj[key])) {
+        obj[key].forEach((item: any) => {
+          const child = parent.ele(sanitizedKey);
+          buildXML(item, child);
+        });
+      } else if (typeof obj[key] === 'object') {
+        const child = parent.ele(sanitizedKey);
+        buildXML(obj[key], child);
+      } else {
+        parent.ele(sanitizedKey).txt(obj[key]);
+      }
+    });
+  };
+
+  buildXML(jsonData, root);
+  const xmlContent = root.end({ prettyPrint: true });
+
+  // Generate the XML file
+  const tempDir = os.tmpdir();
+  const xmlFilePath = path.join(tempDir, `${req.file.filename}.xml`);
+  fs.writeFileSync(xmlFilePath, xmlContent);
+
+  res.setHeader(
+    'Content-disposition',
+    `attachment; filename=${req.file?.originalname}.xml`
+  );
+  res.setHeader('Content-type', 'application/xml');
+  res.sendFile(xmlFilePath, (err) => {
+    if (err) {
+      res.status(500).send('Error downloading the file.');
+    } else {
+      // Optional: clean up the uploaded JSON and generated XML files
+      // fs.unlink(filePath, (unlinkErr) => {
+      //   if (unlinkErr) console.error(`Error deleting file ${filePath}`);
+      // });
+      // fs.unlink(xmlFilePath, (unlinkErr) => {
+      //   if (unlinkErr) console.error(`Error deleting file ${xmlFilePath}`);
+      // });
+    }
+  });
+});
 
 //#endregion json
 
